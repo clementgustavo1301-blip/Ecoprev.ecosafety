@@ -11,13 +11,7 @@ import {
   Clock,
   Lock,
   ChevronRight,
-  Activity,
-  Building2,
-  Search,
-  CheckCircle2,
-  Loader2,
-  Sparkles,
-  AlertCircle
+  Activity
 } from "lucide-react";
 
 function LandingContent() {
@@ -27,70 +21,8 @@ function LandingContent() {
   const [activeRole, setActiveRole] = useState<"PARTNER" | "DOCTOR" | null>(null);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [name, setName] = useState("");
-  const [crm, setCrm] = useState("");
-  const [specialty, setSpecialty] = useState("");
-  const [cnpj, setCnpj] = useState("");
-  const [tradeName, setTradeName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
-  const [cnpjLoading, setCnpjLoading] = useState(false);
-  const [cnpjSuccess, setCnpjSuccess] = useState(false);
-  const [cnpjError, setCnpjError] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
-
-  const formatCNPJ = (val: string) => {
-    return val
-      .replace(/\D/g, "")
-      .slice(0, 14)
-      .replace(/^(\d{2})(\d)/, "$1.$2")
-      .replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3")
-      .replace(/\.(\d{3})(\d)/, ".$1/$2")
-      .replace(/(\d{4})(\d)/, "$1-$2");
-  };
-
-  const handleCnpjChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const formatted = formatCNPJ(e.target.value);
-    setCnpj(formatted);
-    setCnpjSuccess(false);
-    setCnpjError("");
-
-    const clean = formatted.replace(/\D/g, "");
-    if (clean.length === 14) {
-      fetchCNPJData(clean);
-    }
-  };
-
-  const fetchCNPJData = async (cleanCnpj?: string) => {
-    const target = cleanCnpj || cnpj.replace(/\D/g, "");
-    if (target.length !== 14) {
-      setCnpjError("Digite os 14 dígitos do CNPJ");
-      return;
-    }
-    setCnpjLoading(true);
-    setCnpjError("");
-
-    try {
-      const res = await fetch(`/api/cnpj/${target}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || "CNPJ não encontrado na Receita Federal");
-      }
-      setName(data.companyName || "");
-      setTradeName(data.tradeName || "");
-      if (data.email && !email) setEmail(data.email.toLowerCase());
-      if (data.phone) setPhone(data.phone);
-      if (data.address) setAddress(data.address);
-      setCnpjSuccess(true);
-    } catch (err: any) {
-      setCnpjError(err.message || "Erro ao consultar CNPJ");
-      setCnpjSuccess(false);
-    } finally {
-      setCnpjLoading(false);
-    }
-  };
 
   useEffect(() => {
     const role = searchParams.get("role");
@@ -110,38 +42,14 @@ function LandingContent() {
     setErrorMsg("");
 
     try {
-      if (isRegister) {
-        if (!name) throw new Error(activeRole === "PARTNER" ? "Preencha o CNPJ para buscar os dados da empresa." : "Preencha seu nome completo.");
-        if (activeRole === "PARTNER" && !cnpj) throw new Error("CNPJ é obrigatório para cadastro de parceiro.");
-        if (activeRole === "DOCTOR" && !crm) throw new Error("CRM é obrigatório para cadastro de médico perito.");
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password, role: activeRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Falha no acesso");
 
-        const res = await fetch("/api/auth/register", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name, 
-            email, 
-            password,
-            role: activeRole,
-            crm: activeRole === "DOCTOR" ? crm : null,
-            specialty: activeRole === "DOCTOR" ? (specialty || "Medicina do Trabalho") : null,
-            cnpj: activeRole === "PARTNER" ? cnpj : null,
-            tradeName: activeRole === "PARTNER" ? tradeName : null,
-            phone: phone || null,
-            address: address || null,
-          }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Erro ao registrar");
-      } else {
-        const res = await fetch("/api/auth/login", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email, password, role: activeRole }),
-        });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Falha no acesso");
-      }
       window.location.href =
         activeRole === "DOCTOR" ? "/doctor/dashboard" : "/partner/dashboard";
     } catch (err: any) {
@@ -153,17 +61,6 @@ function LandingContent() {
   const resetForm = () => {
     setEmail(""); 
     setPassword(""); 
-    setName("");
-    setCrm(""); 
-    setSpecialty(""); 
-    setCnpj("");
-    setTradeName("");
-    setPhone("");
-    setAddress("");
-    setCnpjLoading(false);
-    setCnpjSuccess(false);
-    setCnpjError("");
-    setIsRegister(false); 
     setErrorMsg("");
   };
 
@@ -372,7 +269,7 @@ function LandingContent() {
                       {activeRole === "DOCTOR" ? "Médico Perito" : "Empresa Parceira"}
                     </p>
                     <p className="text-[11px] text-[#555]">
-                      {isRegister ? "Criar nova conta" : "Entrar na plataforma"}
+                      Entrar na plataforma
                     </p>
                   </div>
                 </div>
@@ -392,166 +289,6 @@ function LandingContent() {
               )}
 
               <form onSubmit={handleLogin} className="flex flex-col gap-3">
-                {isRegister && activeRole === "PARTNER" && (
-                  <>
-                    {/* CNPJ Field with API Auto-Fetch */}
-                    <div>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <label className="block text-[11px] font-medium text-[#737373] uppercase tracking-wider">
-                          CNPJ da Empresa
-                        </label>
-                        <span className="text-[10px] text-[#10a37f] font-medium flex items-center gap-1">
-                          <Sparkles className="w-3 h-3" />
-                          Preenchimento Automático
-                        </span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg pl-9 pr-24 py-2.5 text-[13px] text-white placeholder-[#444] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all font-mono"
-                          placeholder="00.000.000/0001-00"
-                          value={cnpj}
-                          onChange={handleCnpjChange}
-                          maxLength={18}
-                        />
-                        <Building2 className="w-4 h-4 text-[#737373] absolute left-3 pointer-events-none" />
-                        <button
-                          type="button"
-                          onClick={() => fetchCNPJData()}
-                          disabled={cnpjLoading || cnpj.replace(/\D/g, "").length !== 14}
-                          className="absolute right-1.5 px-2.5 py-1.5 rounded-md bg-[#10a37f]/15 hover:bg-[#10a37f]/25 text-[#10a37f] text-[11px] font-medium border border-[#10a37f]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1"
-                        >
-                          {cnpjLoading ? (
-                            <>
-                              <Loader2 className="w-3 h-3 animate-spin" />
-                              Buscando...
-                            </>
-                          ) : (
-                            <>
-                              <Search className="w-3 h-3" />
-                              Consultar
-                            </>
-                          )}
-                        </button>
-                      </div>
-                      {cnpjError && (
-                        <p className="text-[11px] text-[#ef4444] mt-1 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 shrink-0" />
-                          {cnpjError}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Verified Company Card (Data fetched from API) */}
-                    {cnpjSuccess && (
-                      <div className="p-3.5 bg-[#10a37f]/10 border border-[#10a37f]/25 rounded-lg text-xs flex flex-col gap-1.5 animate-fadeIn">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[#10a37f] font-semibold flex items-center gap-1.5 text-[11px]">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            Empresa Verificada na Receita Federal
-                          </span>
-                          <span className="text-[10px] bg-[#10a37f]/20 text-[#10a37f] px-1.5 py-0.5 rounded font-mono font-bold">
-                            ATIVA
-                          </span>
-                        </div>
-                        <p className="text-white font-medium text-[13px]">{name}</p>
-                        {tradeName && tradeName !== name && (
-                          <p className="text-[#a3a3a3] text-[11px]">Fantasia: {tradeName}</p>
-                        )}
-                        {address && (
-                          <p className="text-[#737373] text-[11px] leading-snug">{address}</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Razão Social (Auto-filled) */}
-                    <div>
-                      <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                        Razão Social
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                        placeholder="Nome Empresarial / Razão Social"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </div>
-
-                    {/* Nome Fantasia e Telefone */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                          Nome Fantasia
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                          placeholder="Nome Comercial"
-                          value={tradeName}
-                          onChange={(e) => setTradeName(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                          Telefone Comercial
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                          placeholder="(11) 99999-9999"
-                          value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
-                {isRegister && activeRole === "DOCTOR" && (
-                  <>
-                    <div>
-                      <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                        Nome Completo do Médico
-                      </label>
-                      <input
-                        type="text"
-                        className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                        placeholder="Ex: Dr. Roberto Alcantara"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                          CRM
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                          placeholder="Ex: CRM/SP 123456"
-                          value={crm}
-                          onChange={(e) => setCrm(e.target.value)}
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">
-                          Especialidade
-                        </label>
-                        <input
-                          type="text"
-                          className="w-full bg-white/[0.04] border border-white/[0.08] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#10a37f]/40 focus:ring-1 focus:ring-[#10a37f]/20 transition-all"
-                          placeholder="Ex: Medicina do Trabalho"
-                          value={specialty}
-                          onChange={(e) => setSpecialty(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  </>
-                )}
-
                 <div>
                   <label className="block text-[11px] font-medium text-[#737373] mb-1.5 uppercase tracking-wider">E-mail</label>
                   <input
@@ -579,27 +316,23 @@ function LandingContent() {
                 <button
                   type="submit"
                   disabled={loading}
-                  className="btn-primary w-full text-white text-[13px] font-semibold py-2.5 px-4 rounded-lg mt-1 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="btn-primary w-full text-white text-[13px] font-semibold py-2.5 px-4 rounded-lg mt-2 flex justify-center items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                 >
                   {loading ? (
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                   ) : (
                     <>
                       <Lock className="w-3.5 h-3.5" />
-                      {isRegister ? "Criar conta" : "Entrar"}
+                      Entrar
                     </>
                   )}
                 </button>
               </form>
 
               <div className="mt-4 text-center">
-                <button
-                  type="button"
-                  onClick={() => { setIsRegister(!isRegister); setErrorMsg(""); }}
-                  className="text-[11px] text-[#555] hover:text-[#10a37f] transition-colors"
-                >
-                  {isRegister ? "Já tem conta? Entre aqui" : "Primeira vez? Crie sua conta"}
-                </button>
+                <p className="text-[11px] text-[#555]">
+                  Acesso restrito. Solicite suas credenciais ao administrador.
+                </p>
               </div>
             </div>
           )}
