@@ -1,0 +1,63 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   @default("123456")
+  name      String?
+  role      String   @default("PARTNER") // "PARTNER" or "DOCTOR"
+  crm       String?  // For DOCTOR (e.g. CRM/SP 123456)
+  specialty String?  // For DOCTOR (e.g. Medicina Ocupacional)
+  cnpj      String?  // For PARTNER (e.g. 00.000.000/0001-00)
+  tradeName String?  // Nome Fantasia
+  phone     String?  // Telefone
+  address   String?  // Logradouro, Bairro, Cidade/UF
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  cases     Case[]
+}
+
+model Case {
+  id          String   @id @default(cuid())
+  partnerId   String
+  partner     User     @relation(fields: [partnerId], references: [id])
+  status      String   @default("PENDING_DOCS") // PENDING_DOCS, PROCESSING_AI, PENDING_REVIEW, COMPLETED
+  patientName String
+  anamnesis   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  documents   Document[]
+  report      Report?
+}
+
+model Document {
+  id        String   @id @default(cuid())
+  caseId    String
+  case      Case     @relation(fields: [caseId], references: [id])
+  type      String   // "LAUDO", "EXAME", "RECEITA"
+  url       String   // Local path or mock URL for MVP
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id                 String   @id @default(cuid())
+  caseId             String   @unique
+  case               Case     @relation(fields: [caseId], references: [id])
+  suggestedCIDs      String?
+  causalNexus        String?
+  finalContent       String?  // The full text of the report
+  signedAt           DateTime?
+  signedByDoctorName String?
+  signedByDoctorCrm  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}

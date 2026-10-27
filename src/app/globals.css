@@ -1,0 +1,103 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #f5f5f5;
+
+    --card: #141414;
+    --card-foreground: #f5f5f5;
+
+    --primary: #10a37f;
+    --primary-foreground: #ffffff;
+
+    --secondary: #1a1a1a;
+    --secondary-foreground: #f5f5f5;
+
+    --muted: #262626;
+    --muted-foreground: #a3a3a3;
+
+    --accent: #10a37f;
+    --accent-foreground: #ffffff;
+
+    --destructive: #ef4444;
+    --destructive-foreground: #ffffff;
+
+    --border: #262626;
+    --input: #1a1a1a;
+    --ring: #10a37f;
+
+    --radius: 0.625rem;
+  }
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  ::selection {
+    background-color: var(--accent);
+    color: var(--accent-foreground);
+  }
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Utilities */
+@layer utilities {
+  .glow-green {
+    box-shadow: 0 0 80px rgba(16, 163, 127, 0.15), 0 0 160px rgba(16, 163, 127, 0.05);
+  }
+  .glow-subtle {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.5), 0 0 40px rgba(255,255,255,0.02);
+  }
+  .gradient-text {
+    background: linear-gradient(135deg, #10a37f 0%, #1a7f64 50%, #10a37f 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .gradient-text-white {
+    background: linear-gradient(135deg, #ffffff 0%, #a3a3a3 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .card-hover {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .card-hover:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 30px rgba(0,0,0,0.4), 0 0 1px rgba(255,255,255,0.1);
+    border-color: #333;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, #10a37f 0%, #0d8c6d 100%);
+    transition: all 0.2s ease;
+  }
+  .btn-primary:hover {
+    background: linear-gradient(135deg, #12b88e 0%, #10a37f 100%);
+    box-shadow: 0 4px 20px rgba(16, 163, 127, 0.3);
+  }
+}
