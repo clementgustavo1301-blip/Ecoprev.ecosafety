@@ -4,6 +4,8 @@ import { generateMedicalReport, extractTextFromMultipleImages } from '@/lib/ai';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: Request) {
   try {
     const { caseId } = await req.json();

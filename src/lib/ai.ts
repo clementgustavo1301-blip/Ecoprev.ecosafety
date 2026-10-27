@@ -2,19 +2,25 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import OpenAI from 'openai';
 
 // ═══════════════════════════════════════════════
-// CLIENTS
+// CLIENTS (Lazy getters to prevent build-time missing env var errors)
 // ═══════════════════════════════════════════════
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+function getGenAI() {
+  return new GoogleGenerativeAI(process.env.GEMINI_API_KEY || '');
+}
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-});
+function getOpenAI() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || 'dummy_key_to_prevent_build_error',
+  });
+}
 
-const groq = new OpenAI({
-  apiKey: process.env.GROQ_API_KEY || '',
-  baseURL: "https://api.groq.com/openai/v1",
-});
+function getGroq() {
+  return new OpenAI({
+    apiKey: process.env.GROQ_API_KEY || 'dummy_key_to_prevent_build_error',
+    baseURL: "https://api.groq.com/openai/v1",
+  });
+}
 
 // ═══════════════════════════════════════════════
 // ETAPA 1: Gemini Vision — Leitura de Imagens/OCR
@@ -46,6 +52,10 @@ export async function extractTextFromImage(
   imageBase64: string,
   mimeType: string = 'image/jpeg'
 ): Promise<string> {
+  const genAI = getGenAI();
+  const openai = getOpenAI();
+  const groq = getGroq();
+
   const geminiModels = ['gemini-3.5-flash', 'gemini-flash-latest', 'gemini-3.7-flash'];
 
   for (const modelName of geminiModels) {
@@ -185,6 +195,10 @@ export async function generateMedicalReport(
   extractedDocumentsText: string,
   additionalNotes: string = ''
 ): Promise<AIAnalysisResult> {
+  const genAI = getGenAI();
+  const openai = getOpenAI();
+  const groq = getGroq();
+
   const combinedText = `
 DADOS DO PACIENTE:
 Nome: ${patientName}
