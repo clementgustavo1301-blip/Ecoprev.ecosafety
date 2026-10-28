@@ -99,17 +99,26 @@ export async function POST(req: Request) {
         }
       });
     } else {
-      // Se o usuário já possui cadastro, validar se está tentando entrar no perfil correto
+      // Se o perfil foi alterado no Supabase Auth (User Metadata), sincronizar para o banco
+      const metadataRole = supabaseUser?.user_metadata?.role;
+      if (metadataRole && (metadataRole === 'PARTNER' || metadataRole === 'DOCTOR') && dbUser.role !== metadataRole) {
+        dbUser = await prisma.user.update({
+          where: { id: dbUser.id },
+          data: { role: metadataRole }
+        });
+      }
+
+      // Validar estritamente: o usuário SÓ pode acessar o ambiente do seu perfil configurado no banco de dados
       if (reqRole && dbUser.role && dbUser.role !== reqRole) {
         const perfilCadastrado = dbUser.role === 'DOCTOR' ? 'Médico Perito' : 'Empresa Parceira';
         const perfilTentado = reqRole === 'DOCTOR' ? 'Médico Perito' : 'Empresa Parceira';
 
         return NextResponse.json({ 
-          error: `Acesso negado: esta conta é cadastrada como ${perfilCadastrado} e não possui permissão para acessar o painel de ${perfilTentado}.` 
+          error: `Acesso negado: esta conta está cadastrada no banco de dados como ${perfilCadastrado} e não possui permissão para acessar o painel de ${perfilTentado}.` 
         }, { status: 403 });
       }
 
-      // Manter a senha atualizada caso tenha sido alterada no Supabase
+      // Manter a senha sincronizada
       dbUser = await prisma.user.update({
         where: { id: dbUser.id },
         data: { password: hashedPassword }
