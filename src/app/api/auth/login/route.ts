@@ -68,31 +68,29 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         error: detailedMsg,
         supabaseMessage: supabaseError?.message,
-        supabaseCode: (supabaseError as any)?.code,
-        configuredUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'FALLBACK_USED',
-        version: 'v-supabase-diag-1'
+        supabaseCode: (supabaseError as any)?.code
       }, { status: 401 });
     }
 
     // 3. Sincronizar o usuário autenticado do Supabase com a tabela do Prisma (necessária para relações de Casos, Laudos e Perfil)
-    const targetRole = reqRole || supabaseUser?.user_metadata?.role || dbUser?.role || 'PARTNER';
-    const rawName = supabaseUser?.user_metadata?.name || 
-                    supabaseUser?.user_metadata?.full_name || 
-                    dbUser?.name || 
-                    cleanEmail.split('@')[0];
-    const targetName = targetRole === 'DOCTOR' && !rawName.startsWith('Dr') ? `Dr. ${rawName}` : rawName;
-
     const hashedPassword = await bcrypt.hash(password, 10);
 
     if (!dbUser) {
+      // Primeira vez que o usuário loga: define o papel fixo com base na opção selecionada ou metadata
+      const initialRole = supabaseUser?.user_metadata?.role || reqRole || 'PARTNER';
+      const rawName = supabaseUser?.user_metadata?.name || 
+                      supabaseUser?.user_metadata?.full_name || 
+                      cleanEmail.split('@')[0];
+      const targetName = initialRole === 'DOCTOR' && !rawName.startsWith('Dr') ? `Dr. ${rawName}` : rawName;
+
       dbUser = await prisma.user.create({
         data: {
           id: supabaseUser?.id || undefined,
           email: cleanEmail,
           name: targetName,
-          role: targetRole,
-          crm: supabaseUser?.user_metadata?.crm || (targetRole === 'DOCTOR' ? 'CRM/SP A Definir' : null),
-          specialty: supabaseUser?.user_metadata?.specialty || (targetRole === 'DOCTOR' ? 'Medicina do Trabalho' : null),
+          role: initialRole,
+          crm: supabaseUser?.user_metadata?.crm || (initialRole === 'DOCTOR' ? 'CRM/SP A Definir' : null),
+          specialty: supabaseUser?.user_metadata?.specialty || (initialRole === 'DOCTOR' ? 'Medicina do Trabalho' : null),
           cnpj: supabaseUser?.user_metadata?.cnpj || null,
           tradeName: supabaseUser?.user_metadata?.tradeName || targetName,
           phone: supabaseUser?.user_metadata?.phone || null,
@@ -101,14 +99,20 @@ export async function POST(req: Request) {
         }
       });
     } else {
-      // Atualizar dados se necessário (ex: papel ou sincronização de senha)
-      const dataToUpdate: any = { password: hashedPassword };
-      if (reqRole && dbUser.role !== reqRole) {
-        dataToUpdate.role = reqRole;
+      // Se o usuário já possui cadastro, validar se está tentando entrar no perfil correto
+      if (reqRole && dbUser.role && dbUser.role !== reqRole) {
+        const perfilCadastrado = dbUser.role === 'DOCTOR' ? 'Médico Perito' : 'Empresa Parceira';
+        const perfilTentado = reqRole === 'DOCTOR' ? 'Médico Perito' : 'Empresa Parceira';
+
+        return NextResponse.json({ 
+          error: `Acesso negado: esta conta é cadastrada como ${perfilCadastrado} e não possui permissão para acessar o painel de ${perfilTentado}.` 
+        }, { status: 403 });
       }
+
+      // Manter a senha atualizada caso tenha sido alterada no Supabase
       dbUser = await prisma.user.update({
         where: { id: dbUser.id },
-        data: dataToUpdate
+        data: { password: hashedPassword }
       });
     }
 
