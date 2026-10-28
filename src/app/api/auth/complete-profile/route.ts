@@ -115,3 +115,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Erro ao salvar informações do perfil' }, { status: 500 });
   }
 }
+
