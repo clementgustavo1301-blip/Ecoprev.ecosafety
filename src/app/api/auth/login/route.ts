@@ -68,7 +68,9 @@ export async function POST(req: Request) {
       return NextResponse.json({ 
         error: detailedMsg,
         supabaseMessage: supabaseError?.message,
-        supabaseCode: (supabaseError as any)?.code
+        supabaseCode: (supabaseError as any)?.code,
+        configuredUrl: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || 'FALLBACK_USED',
+        version: 'v-supabase-diag-1'
       }, { status: 401 });
     }
 
