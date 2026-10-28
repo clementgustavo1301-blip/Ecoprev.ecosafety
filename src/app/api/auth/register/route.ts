@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { setSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
   try {
@@ -45,7 +44,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // Criar no Supabase Auth
+    // Criar no Supabase Auth (a senha é criptografada e armazenada com segurança pelo Supabase)
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: cleanEmail,
       password: password,
@@ -65,22 +64,19 @@ export async function POST(req: Request) {
 
     if (authError) {
       console.warn('Supabase auth.signUp aviso/erro:', authError.message);
-      // Se for erro de já cadastrado no Supabase
       if (authError.message.toLowerCase().includes('already registered')) {
         return NextResponse.json({ error: 'E-mail já cadastrado no Supabase Auth' }, { status: 400 });
       }
     }
 
     const userId = authData?.user?.id || undefined;
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newUser = await prisma.user.create({
       data: {
         id: userId,
         email: cleanEmail,
-        password: hashedPassword,
         name: name,
-        role: role, // 'PARTNER' or 'DOCTOR'
+        role: role,
         crm: role === 'DOCTOR' ? crm : null,
         specialty: role === 'DOCTOR' ? (specialty || 'Medicina do Trabalho') : null,
         cnpj: role === 'PARTNER' ? cleanCnpj : null,
@@ -113,4 +109,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Erro ao registrar usuário' }, { status: 500 });
   }
 }
-

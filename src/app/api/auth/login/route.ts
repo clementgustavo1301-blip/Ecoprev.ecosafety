@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
 import { setSession } from '@/lib/auth';
 import { supabase } from '@/lib/supabase';
-import bcrypt from 'bcryptjs';
 
 export async function POST(req: Request) {
   try {
@@ -14,7 +13,7 @@ export async function POST(req: Request) {
 
     const cleanEmail = email.trim().toLowerCase();
 
-    // 1. Tentar autenticar primariamente com o Supabase Auth
+    // 1. Tentar autenticar primariamente com o Supabase Auth (a senha é verificada diretamente pelo Supabase)
     let supabaseUser: any = null;
     const { data: supabaseData, error: supabaseError } = await supabase.auth.signInWithPassword({
       email: cleanEmail,
@@ -39,24 +38,7 @@ export async function POST(req: Request) {
       }
     }
 
-    // 2. Se o Supabase Auth falhou (usuário não existe lá ou credenciais erradas),
-    // verificar fallback local no Prisma (ex: usuários criados via seed ou anteriormente)
-    let dbUser = await prisma.user.findFirst({
-      where: { email: cleanEmail }
-    });
-
-    let authenticated = false;
-
-    if (supabaseUser) {
-      authenticated = true;
-    } else if (dbUser && dbUser.password) {
-      const isValid = await bcrypt.compare(password, dbUser.password);
-      if (isValid) {
-        authenticated = true;
-      }
-    }
-
-    if (!authenticated) {
+    if (!supabaseUser) {
       let detailedMsg = 'Credenciais inválidas. Verifique seu e-mail e senha no Supabase Auth.';
       if (supabaseError) {
         if (supabaseError.message === 'Invalid login credentials') {
@@ -72,12 +54,14 @@ export async function POST(req: Request) {
       }, { status: 401 });
     }
 
-    // 3. Sincronizar o usuário autenticado do Supabase com a tabela do Prisma (necessária para relações de Casos, Laudos e Perfil)
-    const hashedPassword = await bcrypt.hash(password, 10);
+    // 2. Sincronizar o usuário autenticado do Supabase com a tabela do Prisma (necessária para relações de Casos, Laudos e Perfil)
+    let dbUser = await prisma.user.findFirst({
+      where: { email: cleanEmail }
+    });
 
     if (!dbUser) {
       // Primeira vez que o usuário loga: define o papel fixo com base na opção selecionada ou metadata
-      const initialRole = supabaseUser?.user_metadata?.role || reqRole || 'PARTNER';
+      const initialRole = (supabaseUser?.user_metadata?.role as any) || reqRole || 'PARTNER';
       const rawName = supabaseUser?.user_metadata?.name || 
                       supabaseUser?.user_metadata?.full_name || 
                       cleanEmail.split('@')[0];
@@ -95,7 +79,6 @@ export async function POST(req: Request) {
           tradeName: supabaseUser?.user_metadata?.tradeName || targetName,
           phone: supabaseUser?.user_metadata?.phone || null,
           address: supabaseUser?.user_metadata?.address || null,
-          password: hashedPassword,
         }
       });
     } else {
@@ -117,12 +100,6 @@ export async function POST(req: Request) {
           error: `Acesso negado: esta conta está cadastrada no banco de dados como ${perfilCadastrado} e não possui permissão para acessar o painel de ${perfilTentado}.` 
         }, { status: 403 });
       }
-
-      // Manter a senha sincronizada
-      dbUser = await prisma.user.update({
-        where: { id: dbUser.id },
-        data: { password: hashedPassword }
-      });
     }
 
     // Salvar sessão HTTP-Only via cookie com o ID do usuário
@@ -144,4 +121,3 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: error.message || 'Erro ao processar login' }, { status: 500 });
   }
 }
-

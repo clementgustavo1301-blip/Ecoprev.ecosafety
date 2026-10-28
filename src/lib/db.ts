@@ -34,7 +34,6 @@ export async function getMockPartner() {
     partner = await prisma.user.create({
       data: {
         email: 'partner@mock.com',
-        password: 'mockpassword',
         name: 'Mock Partner',
         role: 'PARTNER'
       }
@@ -49,7 +48,6 @@ export async function getMockDoctor() {
     doctor = await prisma.user.create({
       data: {
         email: 'doctor@mock.com',
-        password: 'mockpassword',
         name: 'Mock Doctor',
         role: 'DOCTOR',
         crm: 'CRM/SP 123456'
