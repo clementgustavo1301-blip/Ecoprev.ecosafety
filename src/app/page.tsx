@@ -50,8 +50,9 @@ function LandingContent() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Falha no acesso");
 
+      const finalRole = data.user?.role || activeRole;
       window.location.href =
-        activeRole === "DOCTOR" ? "/doctor/dashboard" : "/partner/dashboard";
+        finalRole === "DOCTOR" ? "/doctor/dashboard" : "/partner/dashboard";
     } catch (err: any) {
       setErrorMsg(err.message || "Erro ao autenticar");
       setLoading(false);

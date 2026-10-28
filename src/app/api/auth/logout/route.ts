@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server';
 import { clearSession } from '@/lib/auth';
+import { supabase } from '@/lib/supabase';
 
 export async function POST() {
   try {
+    await supabase.auth.signOut().catch(() => {});
     await clearSession();
     return NextResponse.json({ success: true });
   } catch (error) {
