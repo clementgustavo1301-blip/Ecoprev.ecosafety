@@ -73,7 +73,7 @@ export async function POST(req: Request) {
           email: cleanEmail,
           name: targetName,
           role: initialRole,
-          crm: supabaseUser?.user_metadata?.crm || (initialRole === 'DOCTOR' ? 'CRM/SP A Definir' : null),
+          crm: supabaseUser?.user_metadata?.crm || null,
           specialty: supabaseUser?.user_metadata?.specialty || (initialRole === 'DOCTOR' ? 'Medicina do Trabalho' : null),
           cnpj: supabaseUser?.user_metadata?.cnpj || null,
           tradeName: supabaseUser?.user_metadata?.tradeName || targetName,
@@ -105,15 +105,40 @@ export async function POST(req: Request) {
     // Salvar sessão HTTP-Only via cookie com o ID do usuário
     await setSession(dbUser.id);
 
+    // 3. Verificar se é necessário completar cadastro (Primeiro Login)
+    const isDoctor = dbUser.role === 'DOCTOR';
+    const isPartner = dbUser.role === 'PARTNER';
+
+    const isDoctorIncomplete = isDoctor && (
+      !dbUser.crm ||
+      dbUser.crm.trim() === '' ||
+      dbUser.crm.toUpperCase() === 'CRM/SP A DEFINIR' ||
+      !dbUser.name ||
+      dbUser.name.trim() === '' ||
+      dbUser.name === cleanEmail.split('@')[0]
+    );
+
+    const isPartnerIncomplete = isPartner && (
+      !dbUser.cnpj ||
+      dbUser.cnpj.trim() === ''
+    );
+
+    const requiresOnboarding = isDoctorIncomplete || isPartnerIncomplete;
+
     return NextResponse.json({
       success: true,
+      requiresOnboarding,
       user: {
         id: dbUser.id,
         name: dbUser.name,
         email: dbUser.email,
         role: dbUser.role,
         crm: dbUser.crm,
-        specialty: dbUser.specialty
+        specialty: dbUser.specialty,
+        cnpj: dbUser.cnpj,
+        tradeName: dbUser.tradeName,
+        phone: dbUser.phone,
+        address: dbUser.address,
       }
     });
   } catch (error: any) {
