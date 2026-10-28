@@ -57,8 +57,18 @@ export async function POST(req: Request) {
     }
 
     if (!authenticated) {
+      let detailedMsg = 'Credenciais inválidas. Verifique seu e-mail e senha no Supabase Auth.';
+      if (supabaseError) {
+        if (supabaseError.message === 'Invalid login credentials') {
+          detailedMsg = 'E-mail ou senha incorretos no Supabase Auth.';
+        } else {
+          detailedMsg = `Supabase: ${supabaseError.message}`;
+        }
+      }
       return NextResponse.json({ 
-        error: 'Credenciais inválidas. Verifique seu e-mail e senha no Supabase Auth.' 
+        error: detailedMsg,
+        supabaseMessage: supabaseError?.message,
+        supabaseCode: (supabaseError as any)?.code
       }, { status: 401 });
     }
 
