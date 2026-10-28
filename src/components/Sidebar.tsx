@@ -33,7 +33,7 @@ export default function Sidebar() {
   ];
 
   const secondaryLinks = [
-    { name: "Configurações", href: "#", icon: Settings },
+    { name: "Configurações", href: pathname.startsWith("/doctor") ? "/doctor/settings" : "/partner/settings", icon: Settings },
     { name: "Suporte", href: "#", icon: LifeBuoy },
   ];
 
@@ -95,11 +95,13 @@ export default function Sidebar() {
         <div className="h-px bg-[#1a1a1a] mx-1" />
 
         <nav className="flex flex-col gap-0.5">
-          {secondaryLinks.map((link) => (
+          {secondaryLinks.map((link) => {
+            const isActive = pathname === link.href;
+            return (
             <Link
               key={link.name}
               href={link.href}
-              className={`flex items-center gap-2.5 py-2 rounded-lg transition-all text-[#404040] hover:bg-[#141414] hover:text-[#737373] overflow-hidden ${
+              className={`flex items-center gap-2.5 py-2 rounded-lg transition-all overflow-hidden ${isActive ? "bg-[#10a37f]/10 text-[#10a37f]" : "text-[#404040] hover:bg-[#141414] hover:text-[#737373]"} ${
                 isExpanded ? "px-2.5" : "justify-center"
               }`}
               title={!isExpanded ? link.name : undefined}
@@ -107,7 +109,8 @@ export default function Sidebar() {
               <link.icon className="w-[16px] h-[16px] shrink-0" strokeWidth={2} />
               {isExpanded && <span className="text-[13px] font-medium whitespace-nowrap">{link.name}</span>}
             </Link>
-          ))}
+            );
+          })}
         </nav>
       </div>
 

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getCurrentUser } from '@/lib/auth';
 
+export const dynamic = 'force-dynamic';
+
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) {
@@ -15,7 +17,11 @@ export async function GET() {
       email: user.email,
       role: user.role,
       crm: user.crm,
-      specialty: user.specialty
+      specialty: user.specialty,
+      cnpj: user.cnpj,
+      tradeName: user.tradeName,
+      phone: user.phone,
+      address: user.address,
     }
   });
 }

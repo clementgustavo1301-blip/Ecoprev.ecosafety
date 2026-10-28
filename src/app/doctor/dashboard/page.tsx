@@ -2,7 +2,7 @@ import { prisma } from '@/lib/db';
 import { getCurrentUser } from '@/lib/auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { Clock, CheckCircle2, Paperclip } from 'lucide-react';
+import { Clock, CheckCircle2, Paperclip, Settings } from 'lucide-react';
 
 import { unstable_noStore as noStore } from 'next/cache';
 
@@ -72,14 +72,23 @@ export default async function DoctorDashboard() {
               {doctor.name} • {doctor.crm ? `CRM ${doctor.crm}` : 'Médico Perito'} • {doctor.specialty || 'Medicina do Trabalho'}
             </p>
           </div>
-          {casesReadyToReview > 0 && (
-            <div className="flex items-center gap-2 bg-[#10a37f]/10 border border-[#10a37f]/20 px-3 py-1.5 rounded-lg">
-              <div className="w-1.5 h-1.5 rounded-full bg-[#10a37f] animate-pulse" />
-              <span className="text-xs font-medium text-[#10a37f]">
-                {casesReadyToReview} caso(s) aguardando revisão
-              </span>
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            <Link
+              href="/doctor/settings"
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-[#141414] hover:bg-[#1a1a1a] border border-[#262626] hover:border-[#404040] text-xs font-medium text-[#d4d4d4] hover:text-white rounded-lg transition-all"
+            >
+              <Settings className="w-3.5 h-3.5 text-[#10a37f]" />
+              <span>Meu Perfil / CRM</span>
+            </Link>
+            {casesReadyToReview > 0 && (
+              <div className="flex items-center gap-2 bg-[#10a37f]/10 border border-[#10a37f]/20 px-3 py-1.5 rounded-lg">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#10a37f] animate-pulse" />
+                <span className="text-xs font-medium text-[#10a37f]">
+                  {casesReadyToReview} caso(s) aguardando revisão
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Metrics */}
