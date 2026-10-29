@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { generateMedicalReport, extractTextFromMultipleImages } from '@/lib/ai';
+import { generateMedicalReport, extractTextFromMultipleImages, ImagePayload } from '@/lib/ai';
 import { readFile } from 'fs/promises';
 import { join } from 'path';
 
@@ -33,12 +33,11 @@ export async function POST(req: Request) {
       data: { status: 'PROCESSING_AI' }
     });
 
-    // Processar os documentos com a visão da IA (OCR + Análise de Imagem)
+    // Processar os documentos com a visão da IA (OCR + Análise Direta de Imagem)
     let extractedDocumentsText = 'Nenhum documento textual disponível.';
+    const imagesPayload: ImagePayload[] = [];
     
     if (caseData.documents.length > 0) {
-      const imagesPayload = [];
-      
       for (const doc of caseData.documents) {
         if (!doc.url) continue;
         
@@ -59,8 +58,10 @@ export async function POST(req: Request) {
           }
           
           let mimeType = 'image/jpeg';
-          if (doc.url.toLowerCase().endsWith('.png')) mimeType = 'image/png';
-          if (doc.url.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+          const lower = doc.url.toLowerCase();
+          if (lower.endsWith('.png')) mimeType = 'image/png';
+          if (lower.endsWith('.pdf')) mimeType = 'application/pdf';
+          if (lower.endsWith('.webp')) mimeType = 'image/webp';
           
           imagesPayload.push({
             base64,
@@ -73,23 +74,36 @@ export async function POST(req: Request) {
       }
 
       if (imagesPayload.length > 0) {
-        extractedDocumentsText = await extractTextFromMultipleImages(imagesPayload);
+        extractedDocumentsText = await extractTextFromMultipleImages(
+          imagesPayload.map(img => ({
+            base64: img.base64,
+            mimeType: img.mimeType,
+            fileName: img.fileName || 'documento'
+          }))
+        );
       }
     }
 
-    // Chamar o pipeline de IA com anamnese e os textos/laudos das imagens extraídas
+    // Chamar o pipeline de IA com Gemini primário (visão multimodal direta das imagens + anamnese)
     const result = await generateMedicalReport(
       caseData.patientName,
       caseData.partner?.name || 'Não informada',
       caseData.createdAt.toLocaleDateString('pt-BR'),
       extractedDocumentsText,
-      caseData.anamnesis || ''
+      caseData.anamnesis || '',
+      imagesPayload
     );
 
-    // Criar o relatório no banco
-    await prisma.report.create({
-      data: {
+    // Criar ou atualizar o relatório no banco (upsert)
+    await prisma.report.upsert({
+      where: { caseId },
+      create: {
         caseId,
+        suggestedCIDs: result.suggestedCIDs,
+        causalNexus: result.causalNexus,
+        finalContent: result.draftContent,
+      },
+      update: {
         suggestedCIDs: result.suggestedCIDs,
         causalNexus: result.causalNexus,
         finalContent: result.draftContent,
@@ -104,7 +118,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ 
       success: true,
-      message: 'Minuta pericial gerada com sucesso'
+      message: 'Minuta pericial gerada com sucesso via Gemini Visão'
     });
   } catch (error: any) {
     console.error("Erro no processamento IA:", error);

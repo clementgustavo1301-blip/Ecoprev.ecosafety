@@ -22,27 +22,36 @@ function getGroq() {
   });
 }
 
+export interface ImagePayload {
+  base64: string;
+  mimeType: string;
+  fileName?: string;
+}
+
+export interface AIAnalysisResult {
+  suggestedCIDs: string;
+  causalNexus: string;
+  draftContent: string;
+}
+
 // ═══════════════════════════════════════════════
 // ETAPA 1: Visão e Leitura de Imagens / OCR
 // ═══════════════════════════════════════════════
 
-const OCR_PROMPT = `Você é um perito médico especializado em análise de imagens e documentos.
-Analise esta imagem detalhadamente.
+const OCR_PROMPT = `Você é um médico perito especialista em análise de imagens diagnósticas e documentos médicos.
+Analise esta imagem detalhadamente com rigor técnico.
 
-Se for um DOCUMENTO de texto (atestado, exame laboratorial, receita, laudo):
-- Extraia todo o texto visível com precisão, mantendo a estrutura original.
-- Identifique o nome do paciente, datas, médicos, CIDs, diagnósticos, carimbos e assinaturas.
-- Se houver tabela ou resultados de exame, organize em formato legível.
+Se for um DOCUMENTO de texto (atestado, exame laboratorial, receita, laudo de imagem):
+- Extraia todo o texto visível com precisão literal.
+- Identifique com destaque: Nome do paciente, data do exame/atendimento, médico emissor, CRM, CIDs explícitos, hipóteses diagnósticas e conclusões.
+- Mantenha a descrição dos achados e da conclusão exatamente como no documento original.
 
-Se for uma IMAGEM MÉDICA (Radiografia, Ressonância, Ultrassom, Tomografia, Foto Clínica):
-- Descreva detalhadamente o que você está vendo.
-- Aponte possíveis lesões, fraturas, alterações degenerativas, inflamações ou anormalidades visíveis.
-- Descreva a região anatômica exibida e os achados técnicos.
-- Use terminologia médica e radiológica apropriada.
+Se for uma IMAGEM MÉDICA (Radiografia, Ressonância, Ultrassom, Tomografia, Foto de Lesão):
+- Descreva detalhadamente os achados radiológicos objetivos observados diretamente na imagem.
+- Aponte a região anatômica exata, existência ou não de fraturas (traço de fratura, alinhamento, cominuição), luxações, desvios ou alterações teciduais.
+- Aponte o diagnóstico imagiológico correspondente.
 
-Se for qualquer outro tipo de comprovante, descreva a imagem e seu contexto.
-
-Retorne APENAS a extração do texto ou o laudo descritivo da imagem. Não inclua saudações.`;
+Retorne APENAS o texto extraído e o laudo descritivo técnico da imagem. Não inclua saudações.`;
 
 export async function extractTextFromImage(
   imageBase64: string,
@@ -51,12 +60,12 @@ export async function extractTextFromImage(
   const genAI = getGenAI();
   const openai = getOpenAI();
 
-  // Modelos Gemini com suporte a visão e OCR
+  // Modelos Gemini testados com suporte a visão e OCR
   const geminiModels = [
     'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
     'gemini-flash-latest',
-    'gemini-3-flash-preview',
   ];
 
   for (const modelName of geminiModels) {
@@ -131,123 +140,116 @@ export async function extractTextFromMultipleImages(
 }
 
 // ═══════════════════════════════════════════════
-// ETAPA 2: Análise Médica Pericial Estruturada
+// ETAPA 2: Análise Médica Pericial com Visão Direta
 // ═══════════════════════════════════════════════
 
-const SYSTEM_PROMPT = `Você é um Médico Perito do Trabalho sênior, com vasta experiência em perícias judiciais e análise documental ocupacional.
+const SYSTEM_PROMPT = `Você é um Médico Perito do Trabalho sênior (CFM / Perícia Médica Judicial), com vasta experiência em Medicina Ocupacional, avaliação de nexo técnico previdenciário e análise direta de exames de imagem radiológica e documentos clínicos.
 
-Sua função é analisar as queixas, o histórico laboral (anamnese) e os documentos anexados (exames, atestados) para produzir uma Minuta de Parecer Pericial Ocupacional altamente detalhada, técnica e estruturada.
+Sua missão é emitir uma Minuta de Laudo Pericial Ocupacional com MÁXIMA PRECISÃO TÉCNICA E RIGOR FACTUAL, analisando diretamente a anamnese/queixa do trabalhador E AS IMAGENS/DOCUMENTOS ANEXADOS (radiografias, laudos de exames, atestados médicos, prontuários).
 
-Você deve retornar EXATAMENTE no formato JSON abaixo, sem markdown de bloco de código no início ou fim:
+═══════════════════════════════════════════════════════════════════════
+DIRETRIZES CRÍTICAS PARA DETERMINAÇÃO DE CID (PROIBIDO ALUCINAR):
+═══════════════════════════════════════════════════════════════════════
+1. PRECISÃO CIRÚRGICA NO CID:
+   - Identifique APENAS o CID principal EXATO e COMPROVADO pelo exame de imagem ou pelo documento anexado.
+   - NUNCA invente, presuma ou gere listas com múltiplos CIDs genéricos ou diferenciais (ex: NÃO liste contusões múltiplas, quedas de veículo, escoriações ou dores inespecíficas se houver um diagnóstico real estabelecido).
+   - EXEMPLO PRÁTICO: Se o exame de imagem ou o laudo anexado diagnostica fratura de clavícula, o campo suggestedCIDs DEVE SER ESTRITAMENTE: "S42.0 - Fratura da clavícula". NÃO inclua CIDs adicionais de trauma superficial ou contusão.
+   - Limite a no MÁXIMO 1 a 2 CIDs ESTRITAMENTE confirmados pelos achados documentais ou visuais.
+   - Se os documentos/imagens NÃO apresentarem comprovação diagnóstica suficiente para um CID definitivo, declare: "Documentação inconclusiva para fixação de CID definitivo" ou utilize apenas o código do sintoma/queixa restrita relatada.
 
+2. RIGOR FACTUAL E ANÁLISE DE IMAGEM:
+   - NUNCA invente sintomas, datas, lesões ou tratamentos que não constem no relato ou nas imagens.
+   - Descreva com fidelidade o que você observou visualmente no exame de imagem (topografia anatômica, traço de fratura, alinhamento, tecidos moles, integridade ou ausência de alterações) ou no documento médico apresentado.
+
+Você DEVE retornar a resposta EXCLUSIVAMENTE em formato JSON com a seguinte estrutura:
 {
-  "suggestedCIDs": "Lista de CIDs sugeridos com código e descrição (ex: M54.5 - Dor lombar baixa), separados por vírgula",
-  "causalNexus": "Resumo técnico sobre a existência ou não de nexo causal/concausal entre a atividade laboral e a patologia",
-  "draftContent": "O conteúdo completo do relatório em formato Markdown"
+  "suggestedCIDs": "CID(s) específicos e comprovados com código e descrição (ex: S42.0 - Fratura da clavícula). Sem listas genéricas.",
+  "causalNexus": "Parecer técnico sucinto sobre a presença ou ausência de nexo causal/concausal entre o acidente/trabalho e a patologia comprovada.",
+  "draftContent": "Conteúdo pericial completo redigido em Markdown estruturado."
 }
 
-Regras para o 'draftContent' (O Relatório):
-- O texto deve ser extremamente técnico e escrito em 3ª pessoa.
-- ATENÇÃO MÁXIMA: NUNCA invente sintomas, lesões, dores, fraturas ou exames que não estejam explicitamente descritos no input (Anamnese ou Documentos Anexados). Trabalhe APENAS com os fatos fornecidos. Se a informação for vaga, mantenha-a vaga de forma técnica.
-- Use formatação Markdown (## para seções, ** para negrito, - para listas).
-- O relatório DEVE conter obrigatoriamente as seguintes seções:
+Regras para o 'draftContent':
+- Escrito em 3ª pessoa, tom estritamente pericial, forense e formal.
+- Deve conter obrigatoriamente as 4 seções Markdown:
   ## 1. Histórico Profissional e Queixa Principal
-  (Resuma a anamnese, atividades exercidas pelo trabalhador e as queixas relatadas de forma fidedigna ao input)
-  ## 2. Análise Documental
-  (Liste e descreva tecnicamente os achados dos documentos fornecidos. Se não houver documento ou achado, informe explicitamente)
+  (Síntese fidedigna do relato do trabalhador, função exercida e dinâmica do evento)
+  ## 2. Análise Documental e de Imagens
+  (Descrição técnica detalhada dos exames de imagem e documentos anexados analisados visualmente pelo perito)
   ## 3. Discussão Técnica e Nexo Causal
-  (Faça uma correlação biomecânica/ergonômica ou toxicológica entre o trabalho relatado e os achados médicos APRESENTADOS. Discuta se há nexo causal, concausal ou se é doença degenerativa/preexistente)
+  (Correlação biomecânica e ergonômica entre a atividade/acidente e o diagnóstico médico confirmado, fundamentando a presença de nexo causal, concausalidade ou doença degenerativa/preexistente)
   ## 4. Conclusão Pericial
-  (Parecer final conclusivo sobre aptidão, incapacidade temporária/permanente, necessidade de afastamento ao INSS ou reabilitação)
-- Se faltarem informações clínicas ou documentais, aponte isso explicitamente como "Documentação insuficiente para análise clínica completa" ou "Relato escasso de sintomas".`;
-
-export interface AIAnalysisResult {
-  suggestedCIDs: string;
-  causalNexus: string;
-  draftContent: string;
-}
+  (Parecer pericial sobre aptidão laboral, grau de incapacidade - temporária ou permanente -, necessidade de afastamento previdenciário e recomendações terapêuticas/ocupacionais)
+`;
 
 /**
- * Envia o texto extraído dos documentos + contexto do caso para a IA
- * e recebe a minuta pericial estruturada com fallback multi-provedor (Groq, Gemini, OpenAI).
+ * Envia o caso completo COM AS IMAGENS DIRETAS para a IA.
+ * Provedor Primário: Google Gemini com Visão Multimodal (vê a imagem diretamente).
+ * Fallback: OpenAI GPT-4o-mini (com visão) -> Groq (texto).
  */
 export async function generateMedicalReport(
   patientName: string,
   companyName: string,
   caseDate: string,
   extractedDocumentsText: string,
-  additionalNotes: string = ''
+  additionalNotes: string = '',
+  images: ImagePayload[] = []
 ): Promise<AIAnalysisResult> {
-  const combinedText = `
-DADOS DO PACIENTE:
-Nome: ${patientName}
-Empresa: ${companyName}
-Data: ${caseDate}
+  const caseContext = `
+DADOS DO PACIENTE E DO CASO:
+Paciente: ${patientName}
+Empresa Solicitante: ${companyName}
+Data da Avaliação: ${caseDate}
 
-ANAMNESE / RELATO (Notas adicionais):
-${additionalNotes || 'Não informado'}
+ANAMNESE / RELATO OCUPACIONAL:
+${additionalNotes || 'Nenhuma queixa adicional informada.'}
 
-DOCUMENTOS ANEXADOS:
-${extractedDocumentsText || 'Nenhum documento textual disponível.'}
-  `;
+TEXTO EXTRAÍDO DOS DOCUMENTOS / LAUDOS (OCR):
+${extractedDocumentsText || 'Nenhum texto documental pré-extraído.'}
 
-  // ── 1. PROVEDOR PRIMÁRIO: GROQ (Ultra-rápido, modelos modernos de raciocínio) ──
-  const groq = getGroq();
-  const groqModels = [
-    'qwen/qwen3.8-27b',
-    'openai/gpt-oss-120b',
-    'openai/gpt-oss-20b',
-  ];
+IMAGENS ANEXADAS:
+${images.length > 0 ? `${images.length} imagem(ns) médica(s)/documento(s) anexados para análise visual direta.` : 'Nenhuma imagem anexada.'}
+  `.trim();
 
-  for (const modelName of groqModels) {
-    try {
-      console.log(`[AI] Tentando Groq (${modelName})...`);
-      const response = await groq.chat.completions.create({
-        model: modelName,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: 'Analise os seguintes dados do caso:\n' + combinedText },
-        ],
-        temperature: 0.2,
-        response_format: { type: 'json_object' },
-      });
-
-      const responseText = response.choices[0]?.message?.content || '{}';
-      const parsed = JSON.parse(responseText);
-
-      if (parsed.draftContent || parsed.suggestedCIDs) {
-        console.log(`[AI] Sucesso com Groq (${modelName})`);
-        return {
-          suggestedCIDs: parsed.suggestedCIDs || 'Não identificado',
-          causalNexus: parsed.causalNexus || 'Não identificado',
-          draftContent: parsed.draftContent || responseText,
-        };
-      }
-    } catch (groqErr: any) {
-      console.warn(`[AI] Groq (${modelName}) falhou:`, groqErr.message);
-    }
-  }
-
-  // ── 2. SEGUNDO PROVEDOR: GOOGLE GEMINI ──
+  // ══════════════════════════════════════════════════════════════════════
+  // 1. PROVEDOR PRIMÁRIO: GOOGLE GEMINI (VISÃO MULTIMODAL DIRETA DAS IMAGENS)
+  // ══════════════════════════════════════════════════════════════════════
   const genAI = getGenAI();
   const geminiModels = [
     'gemini-3.5-flash',
     'gemini-3.5-flash-lite',
+    'gemini-3.8-flash',
     'gemini-flash-latest',
-    'gemini-3-flash-preview',
   ];
 
   for (const modelName of geminiModels) {
     try {
-      console.log(`[AI] Tentando Gemini (${modelName})...`);
+      console.log(`[AI] Gerando laudo com Gemini Visão (${modelName})...`);
       const model = genAI.getGenerativeModel({ model: modelName });
 
+      // Monta as partes do prompt: imagens como inlineData + contexto textual
+      const parts: any[] = [];
+
+      // Inclui as imagens diretamente para visualização do Gemini
+      for (const img of images) {
+        if (img.base64) {
+          parts.push({
+            inlineData: {
+              mimeType: img.mimeType || 'image/jpeg',
+              data: img.base64,
+            },
+          });
+        }
+      }
+
+      // Adiciona o prompt do sistema e o contexto detalhado do caso
+      parts.push({
+        text: `${SYSTEM_PROMPT}\n\n═══════════════════════════════════════════════════\nDADOS DO CASO PARA ELABORAÇÃO DO LAUDO PERICIAL:\n═══════════════════════════════════════════════════\n${caseContext}`,
+      });
+
       const result = await model.generateContent({
-        contents: [
-          { role: 'user', parts: [{ text: SYSTEM_PROMPT + '\n\nAnalise os seguintes dados do caso:\n' + combinedText }] },
-        ],
+        contents: [{ role: 'user', parts }],
         generationConfig: {
-          temperature: 0.2,
+          temperature: 0.1,
           responseMimeType: 'application/json',
         },
       });
@@ -256,7 +258,7 @@ ${extractedDocumentsText || 'Nenhum documento textual disponível.'}
       const parsed = JSON.parse(responseText);
 
       if (parsed.draftContent || parsed.suggestedCIDs) {
-        console.log(`[AI] Sucesso com Gemini (${modelName})`);
+        console.log(`[AI] Sucesso com Gemini Visão (${modelName})`);
         return {
           suggestedCIDs: parsed.suggestedCIDs || 'Não identificado',
           causalNexus: parsed.causalNexus || 'Não identificado',
@@ -268,47 +270,109 @@ ${extractedDocumentsText || 'Nenhum documento textual disponível.'}
     }
   }
 
-  // ── 3. TERCEIRO PROVEDOR: OPENAI GPT-4o-mini ──
+  // ══════════════════════════════════════════════════════════════════════
+  // 2. SEGUNDO PROVEDOR: OPENAI GPT-4o-mini (COM SUPORTE A VISÃO)
+  // ══════════════════════════════════════════════════════════════════════
   const openai = getOpenAI();
   try {
-    console.log('[AI] Tentando OpenAI (gpt-4o-mini)...');
+    console.log('[AI] Tentando OpenAI (gpt-4o-mini com visão)...');
+    
+    const userContentParts: any[] = [
+      { type: 'text', text: `Analise os seguintes dados do caso e as imagens anexadas:\n\n${caseContext}` },
+    ];
+
+    for (const img of images) {
+      if (img.base64) {
+        userContentParts.push({
+          type: 'image_url',
+          image_url: {
+            url: `data:${img.mimeType || 'image/jpeg'};base64,${img.base64}`,
+          },
+        });
+      }
+    }
+
     const response = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: 'Analise os seguintes dados do caso:\n' + combinedText },
+        { role: 'user', content: userContentParts },
       ],
-      temperature: 0.2,
+      temperature: 0.1,
       response_format: { type: 'json_object' },
     });
 
     const responseText = response.choices[0]?.message?.content || '{}';
     const parsed = JSON.parse(responseText);
 
-    return {
-      suggestedCIDs: parsed.suggestedCIDs || 'Não identificado',
-      causalNexus: parsed.causalNexus || 'Não identificado',
-      draftContent: parsed.draftContent || responseText,
-    };
+    if (parsed.draftContent || parsed.suggestedCIDs) {
+      console.log('[AI] Sucesso com OpenAI (gpt-4o-mini)');
+      return {
+        suggestedCIDs: parsed.suggestedCIDs || 'Não identificado',
+        causalNexus: parsed.causalNexus || 'Não identificado',
+        draftContent: parsed.draftContent || responseText,
+      };
+    }
   } catch (openaiErr: any) {
     console.warn('[AI] OpenAI falhou:', openaiErr.message);
   }
 
-  // ── 4. FALLBACK ESTRUTURADO DE EMERGÊNCIA ──
+  // ══════════════════════════════════════════════════════════════════════
+  // 3. TERCEIRO PROVEDOR: GROQ (FALLBACK TEXTUAL RÁPIDO)
+  // ══════════════════════════════════════════════════════════════════════
+  const groq = getGroq();
+  const groqModels = [
+    'qwen/qwen3.8-27b',
+    'openai/gpt-oss-120b',
+  ];
+
+  for (const modelName of groqModels) {
+    try {
+      console.log(`[AI] Tentando Groq fallback textual (${modelName})...`);
+      const response = await groq.chat.completions.create({
+        model: modelName,
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: 'Analise os seguintes dados do caso:\n' + caseContext },
+        ],
+        temperature: 0.1,
+        response_format: { type: 'json_object' },
+      });
+
+      const responseText = response.choices[0]?.message?.content || '{}';
+      const parsed = JSON.parse(responseText);
+
+      if (parsed.draftContent || parsed.suggestedCIDs) {
+        console.log(`[AI] Sucesso com Groq fallback (${modelName})`);
+        return {
+          suggestedCIDs: parsed.suggestedCIDs || 'Não identificado',
+          causalNexus: parsed.causalNexus || 'Não identificado',
+          draftContent: parsed.draftContent || responseText,
+        };
+      }
+    } catch (groqErr: any) {
+      console.warn(`[AI] Groq (${modelName}) falhou:`, groqErr.message);
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 4. FALLBACK ESTRUTURADO DE EMERGÊNCIA
+  // ══════════════════════════════════════════════════════════════════════
   return {
-    suggestedCIDs: 'CID a definir pelo perito médico',
-    causalNexus: 'Necessária avaliação pericial complementar',
+    suggestedCIDs: 'CID a definir pelo perito médico com base no exame de imagem',
+    causalNexus: 'Necessária avaliação pericial presencial e documental complementar',
     draftContent: `## 1. Histórico Profissional e Queixa Principal
 Paciente **${patientName}**, vinculado à empresa **${companyName}**.
+- **Data da Avaliação:** ${caseDate}
 - **Relato Inicial:** ${additionalNotes || 'Sem anamnese informada.'}
 
-## 2. Análise Documental
-${extractedDocumentsText || 'Nenhum documento textual disponível no momento.'}
+## 2. Análise Documental e de Imagens
+${extractedDocumentsText || 'Exame de imagem ou documento anexado. Realizar leitura direta do arquivo anexado.'}
 
 ## 3. Discussão Técnica e Nexo Causal
-O relato apresenta dados que necessitam de correlação médica presencial ou documental complementar para a consolidação técnica do nexo de causalidade ou concausalidade.
+O relato apresenta histórico de evento ocupacional. Para a fixação definitiva de nexo técnico causal ou concausal, faz-se necessária a validação clínica direta e verificação da integridade das estruturas anatômicas através dos exames de imagem anexados.
 
 ## 4. Conclusão Pericial
-Minuta inicial gerada para suporte. O médico perito responsável deve revisar as informações clínicas, adicionar o CID específico e emitir o parecer conclusivo.`,
+Minuta inicial gerada para suporte. O médico perito responsável deve revisar os exames de imagem anexados, confirmar o CID específico da lesão e homologar o parecer conclusivo.`,
   };
 }
